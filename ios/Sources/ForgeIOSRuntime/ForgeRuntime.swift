@@ -1148,24 +1148,11 @@ public actor ForgeRuntime {
         args: [String: JSONValue], applyEffects: Bool, current: (@Sendable () async -> Bool)? = nil
     ) async -> JSONValue? {
         guard await current?() != false, windowState(id: context.windowID) != nil,
-              let metadata = await windowMetadata(id: context.windowID),
-              let code = metadata.actions?.code, !code.isEmpty,
-              let namespace = metadata.actionNamespace(for: execution.action) else { return nil }
-        var snapshots: [String: JSONValue] = [:]
-        for ref in metadata.dataSources.keys {
-            let id = WindowIdentity(windowID: context.windowID).dataSourceID(ref: ref)
-            let selection = await dataSourceRuntime.selection(dataSourceID: id)
-            let input = await dataSourceRuntime.input(dataSourceID: id)
-            snapshots[ref] = .object([
-                "form": .object(await dataSourceRuntime.form(dataSourceID: id)),
-                "collection": .array(await dataSourceRuntime.collection(dataSourceID: id).map(JSONValue.object)),
-                "selection": .object(["selected": selection.selected.map(JSONValue.object) ?? .null, "selection": .array(selection.selection.map(JSONValue.object)), "rowIndex": .number(Double(selection.rowIndex))]),
-                "input": .object(["filter": .object(input.filter), "parameters": .object(input.parameters), "page": input.page.map { .number(Double($0)) } ?? .null, "fetch": .bool(input.fetch), "refresh": .bool(input.refresh)]),
-                "metrics": .object(await dataSourceRuntime.metrics(dataSourceID: id))
-            ])
-        }
+              let scope = await mutationScope(windowID: context.windowID, source: context.dataSourceRef),
+              let code = scope.metadata.actions?.code, !code.isEmpty,
+              let namespace = scope.metadata.actionNamespace(for: execution.action) else { return nil }
+        let metadata = scope.metadata
         let executionValue = (try? JSONEncoder().encode(execution)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .object([:])
-        let windowForm = await windowFormJSONValue(windowID: context.windowID)
         if let current {
             guard await current() else { return nil }
         } else {
@@ -1175,10 +1162,11 @@ public actor ForgeRuntime {
         do {
             let projection = try UIActionProjection.invoke(
                 code: code, function: execution.action, namespace: namespace,
-                source: context.dataSourceRef, snapshots: snapshots, windowForm: windowForm,
+                source: context.dataSourceRef, snapshots: [:], windowForm: scope.windowForm,
                 props: args.merging(["execution": executionValue]) { current, _ in current },
                 authorization: metadata.authorizationSnapshot, aliases: metadata.actionNamespaces
-            )
+            ,
+                snapshot: { scope.actionState($0, includeFetchFlags: true) })
             if applyEffects {
                 guard await applyProjectedUIEffects(projection.effects, context: context, metadata: metadata, current: current) else { return nil }
             }

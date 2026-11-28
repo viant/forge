@@ -1599,13 +1599,19 @@ struct MutationScope: Sendable {
         })
     }
 
-    private func actionState(_ ref: String) -> JSONValue? {
+    func actionState(_ ref: String, includeFetchFlags: Bool = false) -> JSONValue? {
         guard let state = snapshot(ref) else { return nil }
         let input = state.input, selection = state.selection
+        var inputState: [String: JSONValue] = ["parameters": .object(input.parameters), "filter": .object(input.filter),
+                                               "page": input.page.map { .number(Double($0)) } ?? .null]
+        if includeFetchFlags {
+            inputState["fetch"] = .bool(input.fetch)
+            inputState["refresh"] = .bool(input.refresh)
+        }
         return .object([
             "form": .object(state.form), "collection": .array((state.collection ?? []).map(JSONValue.object)),
             "selection": .object(["selected": selection.selected.map(JSONValue.object) ?? .null, "selection": .array(selection.selection.map(JSONValue.object)), "rowIndex": .number(Double(selection.rowIndex))]),
-            "input": .object(["parameters": .object(input.parameters), "filter": .object(input.filter), "page": input.page.map { .number(Double($0)) } ?? .null]),
+            "input": .object(inputState),
             "pageSize": metadata.dataSources[ref]?.paging?.size.map { .number(Double($0)) } ?? .null,
             "metrics": .object(state.metrics), "dataInfo": .object(state.dataInfo),
             "control": state.projectedControl
