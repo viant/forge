@@ -57,6 +57,10 @@ data class WindowMetadata(
     internal val dialogIndex by lazy { buildMap { dialogs.forEach { dialog -> dialog.id?.let { putIfAbsent(it, dialog) } } } }
     internal val reportReadOwners by lazy { collectReportOwnedDataSourceRefs(this) }
     internal val actionNamespaces by lazy { (listOfNotNull(namespace) + actionAliases).filter { it.isNotBlank() } }
+    // Generic selectors share the serialized field names for this metadata revision.
+    internal val metadataSelectorFields by lazy {
+        JsonUtil.json.encodeToJsonElement(serializer(), this) as JsonObject
+    }
 
     fun actionNamespace(handler: String): String? = actionNamespaces.firstOrNull { handler.startsWith("$it.") }
 }

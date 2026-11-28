@@ -1,5 +1,9 @@
 package com.viant.forgeandroid.runtime
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
 class ParameterResolver {
     fun resolve(params: List<ParameterDef>, context: DataSourceContext): ParameterResolution =
         resolveBindings(params, context, applyCodecs = false)
@@ -9,10 +13,7 @@ class ParameterResolver {
 
     private fun resolveBindings(params: List<ParameterDef>, context: DataSourceContext, applyCodecs: Boolean): ParameterResolution {
         fun decoded(parameter: ParameterDef, raw: Any?): Any? {
-            if (!applyCodecs || parameter.codec == null) return raw
-            val codec = parameter.codec
-            val name = (if (codec is kotlinx.serialization.json.JsonObject) codec["name"] else codec) as? kotlinx.serialization.json.JsonPrimitive
-            return parameterValue(raw, name?.content?.trim()?.lowercase().orEmpty())
+            return if (applyCodecs) decode(parameter, raw) else raw
         }
         val inbound = mutableMapOf<String, MutableMap<String, Any?>>()
         val outbound = mutableListOf<ParameterDef>()
@@ -62,6 +63,12 @@ class ParameterResolver {
         }
 
         return ParameterResolution(inbound, outbound)
+    }
+
+    private fun decode(parameter: ParameterDef, raw: Any?): Any? {
+        val codec = parameter.codec ?: return raw
+        val name = (if (codec is JsonObject) codec["name"] else codec) as? JsonPrimitive
+        return parameterValue(raw, name?.content?.trim()?.lowercase().orEmpty())
     }
 
     private fun parameterValue(raw: Any?, codec: String): Any? {
@@ -170,6 +177,7 @@ class ParameterResolver {
     }
 
     private fun readLegacy(context: DataSourceContext, p: ParameterDef, typed: Boolean = false): Any? {
+        if (p.input == "metadata") return readMetadata(context.window.metadata.peek(), p.location, typed)
         val (sourceContext, location) = resolveLegacySourceContext(context, p.location, wholeReference = typed && (p.input == "selection" || p.input == "form"))
         fun select(store: Any?): Any? = when {
             location == null -> if (typed) SelectorUtil.Missing else null
@@ -189,7 +197,6 @@ class ParameterResolver {
             }
             "filter" -> select(sourceContext.peekFilter())
             "input" -> select(sourceContext.input.peek().bindingValues())
-            "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
             "const" -> if (!typed) p.constantValue() else if (p.locationElement() == null) SelectorUtil.Missing else p.locationAny()
             else -> {
                 p.value?.let(JsonUtil::elementToAny)
@@ -197,6 +204,30 @@ class ParameterResolver {
                     ?: p.locationAny()
             }
         }
+    }
+
+    internal fun resolveMetadataInput(metadata: WindowMetadata?, parameter: ParameterDef): Any? {
+        val value = readMetadata(metadata, parameter.location, typed = false)
+        return if (parameter.location.isNullOrBlank()) value else decode(parameter, value)
+    }
+
+    private fun readMetadata(metadata: WindowMetadata?, location: String?, typed: Boolean): Any? {
+        val missing = if (typed) SelectorUtil.Missing else null
+        if (metadata == null) return missing
+        val path = location?.trim().orEmpty()
+        if (path.isEmpty()) return metadata
+        if (path == "windowKey") return metadata.windowKey ?: missing
+
+        val parts = path.split('.')
+        val value = when (parts.first()) {
+            "authorizationSnapshot" -> {
+                if (parts.size == 1) return metadata.authorizationSnapshot.mapValues { JsonUtil.elementToAny(it.value) }
+                SelectorUtil.resolveParts(metadata.authorizationSnapshot, parts.drop(1), missing)
+            }
+            "dataSources" -> SelectorUtil.resolveParts(metadata.metadataSelectorFields["dataSource"], parts.drop(1), missing)
+            else -> SelectorUtil.resolveParts(metadata.metadataSelectorFields, parts, missing)
+        }
+        return if (value is JsonElement) JsonUtil.elementToAny(value) else value ?: missing
     }
 
     private fun readSelectionValue(context: DataSourceContext, path: String): Any? {
@@ -253,7 +284,8 @@ class ParameterResolver {
         val resolved = linkedMapOf<String, Any?>()
         params.forEach { parameter ->
             val name = parameter.name ?: return@forEach
-            val value = readLegacy(context, parameter)
+            val value = if (parameter.input == "metadata") resolveMetadataInput(context.window.metadata.peek(), parameter)
+                else readLegacy(context, parameter)
             if (value != null || (parameter.input == "const" && parameter.locationElement() != null)) resolved[name] = value
         }
         return resolved

@@ -653,6 +653,9 @@ class DataSourceRuntime(
 
     private fun resolveParameterValue(ctx: DataSourceContext, parameter: ParameterDef): Any? {
         val source = ((parameter.from ?: "").ifBlank { parameter.input ?: "" }).lowercase()
+        if (source == "metadata" && !parameter.location.isNullOrBlank()) {
+            return parameterResolver.resolveMetadataInput(ctx.window.metadata.peek(), parameter)
+        }
         val (sourceContext, location) = resolveSourceContext(ctx, parameter.location)
         return when (source) {
             "const" -> parameter.locationAny() ?: parameter.value?.let(JsonUtil::elementToAny)
