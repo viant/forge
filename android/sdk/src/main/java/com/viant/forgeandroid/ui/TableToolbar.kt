@@ -75,6 +75,7 @@ import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.formatDashboardValue
 import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
@@ -274,7 +275,7 @@ private fun ToolbarGroup(
         ) {
             visibleItems.forEach { item ->
                 when {
-                    toolbarItemIsQuickSearch(item) -> QuickFilter(context, item, itemDisabled(item))
+                    toolbarItemIsQuickSearch(item) -> QuickFilter(runtime, context, item, itemDisabled(item))
                     item.type.equals("select", ignoreCase = true) -> ToolbarSelect(runtime, context, item, itemDisabled(item))
                     item.id.equals("settings", true) && table != null -> ToolbarColumnCustomizer(item, table, hiddenColumnKeys, onHiddenColumnKeysChange, itemDisabled(item))
                     item.id.equals("filterList", true) -> ToolbarFilterControl(item, context, itemDisabled(item))
@@ -291,7 +292,7 @@ private fun ToolbarGroup(
         ) {
             visibleItems.forEach { item ->
                 when {
-                    toolbarItemIsQuickSearch(item) -> QuickFilter(context, item, itemDisabled(item))
+                    toolbarItemIsQuickSearch(item) -> QuickFilter(runtime, context, item, itemDisabled(item))
                     item.type.equals("select", ignoreCase = true) -> ToolbarSelect(runtime, context, item, itemDisabled(item))
                     item.id.equals("settings", true) && table != null -> ToolbarColumnCustomizer(item, table, hiddenColumnKeys, onHiddenColumnKeysChange, itemDisabled(item))
                     item.id.equals("filterList", true) -> ToolbarFilterControl(item, context, itemDisabled(item))
@@ -563,35 +564,76 @@ private fun ToolbarAction(
 }
 
 @Composable
-private fun QuickFilter(context: DataSourceContext, item: ToolbarItemDef, disabled: Boolean) {
-    val input by context.input.flow.collectAsState(initial = context.input.peek())
+private fun QuickFilter(runtime: ForgeRuntime, context: DataSourceContext, item: ToolbarItemDef, disabled: Boolean) {
     val filterSet = quickFilterSet(context)
     val field = toolbarQuickSearchField(item, filterSet)
     val definition = filterSet?.template?.firstOrNull { it.field == field || it.id == field } ?: filterSet?.template?.firstOrNull()
-    var text by remember(field) { mutableStateOf(input.filter[field]?.toString().orEmpty()) }
-    LaunchedEffect(input.filter, field) {
-        val external = input.filter[field]?.toString().orEmpty()
-        if (external != text) text = external
+    val boundValue = if (item.scope.equals("windowForm", ignoreCase = true)) {
+        val signal = context.window.windowFormSignal()
+        val windowForm by signal.flow.collectAsState(initial = signal.peek())
+        windowForm[field]
+    } else {
+        val input by context.input.flow.collectAsState(initial = context.input.peek())
+        input.filter[field]
     }
-    LaunchedEffect(text, field) {
-        delay(300)
-        val current = context.peekFilter()
-        val next = current.toMutableMap()
-        if (text.isBlank()) next.remove(field) else next[field] = text
-        if (next != current) {
-            if (context.dataSource.filterMode.equals("client", ignoreCase = true)) context.input.set(context.input.peek().copy(filter = next))
-            else context.setFilter(next)
+    val committed = boundValue?.toString().orEmpty()
+    var draft by remember(context.input, item, field, disabled) { mutableStateOf<String?>(null) }
+    var submitted by remember(context.input, item, field, disabled) { mutableStateOf(committed) }
+    LaunchedEffect(context.input, field, committed) {
+        if (draft != committed) draft = null
+        submitted = committed
+    }
+    LaunchedEffect(context.input, item, field, disabled, draft) {
+        val value = draft ?: return@LaunchedEffect
+        if (!disabled) {
+            delay(300)
+            commitToolbarQuickSearch(runtime, context, item, field, value, submitted)
+            submitted = value
         }
     }
     OutlinedTextField(
-        value = text,
-        onValueChange = { text = it },
+        value = draft ?: committed,
+        onValueChange = { draft = it },
         enabled = !disabled,
         singleLine = true,
         placeholder = { Text(item.placeholder ?: definition?.placeholder ?: definition?.label ?: "Filter") },
         trailingIcon = { Icon(Icons.Default.Search, contentDescription = "Apply filter") },
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+internal suspend fun commitToolbarQuickSearch(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    item: ToolbarItemDef,
+    field: String,
+    value: String,
+    previousValue: String
+) {
+    if (previousValue == value) return
+    val windowFormBinding = item.scope.equals("windowForm", ignoreCase = true)
+    if (windowFormBinding) {
+        runtime.setWindowFormValues(context.window.windowId, mapOf(field to value), bumpPrefillRevision = false)
+    }
+    val executions = item.on.filter { it.event == "onChange" }
+    if (executions.isNotEmpty()) {
+        val target = mapOf("value" to value)
+        val args = mapOf(
+            "item" to item, "field" to field, "value" to value,
+            "target" to target, "event" to mapOf("target" to target)
+        )
+        val jobs = executions.mapNotNull { execution -> runtime.execute(execution, context, args) }
+        try {
+            jobs.joinAll()
+        } finally {
+            jobs.forEach { job -> if (job.isActive) job.cancel() }
+        }
+    } else if (!windowFormBinding) {
+        val filter = context.peekFilter()
+        val next = filter.toMutableMap()
+        if (value.isBlank()) next.remove(field) else next[field] = value
+        if (next != filter) setToolbarFilter(context, next)
+    }
 }
 
 internal fun toolbarItemIsQuickSearch(item: ToolbarItemDef): Boolean =
@@ -608,7 +650,8 @@ internal fun toolbarBindingField(item: ToolbarItemDef): String =
 
 internal fun toolbarQuickSearchField(item: ToolbarItemDef, filterSet: FilterSetDef?): String {
     val declared = (item.properties["field"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
-    return declared.takeIf { it.isNotBlank() }
+    return item.dataField?.trim()?.takeIf { it.isNotBlank() }
+        ?: declared.takeIf { it.isNotBlank() }
         ?: filterSet?.defaultField?.takeIf { it.isNotBlank() }
         ?: filterSet?.template?.firstOrNull()?.field?.takeIf { !it.isNullOrBlank() }
         ?: filterSet?.template?.firstOrNull()?.id?.takeIf { !it.isNullOrBlank() }

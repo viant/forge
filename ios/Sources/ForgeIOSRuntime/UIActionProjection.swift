@@ -62,7 +62,13 @@ public enum UIActionProjection {
                 setSelected:payload=>{const value=payload||{};state.selection=value;effects.push({kind:'selection',ref,value});return true;},
                 clearSelection:()=>{effects.push({kind:'resetSelection',ref,value:{}});return true;},
                 setWindowFormField:payload=>{const field=payload?.item?.dataField||payload?.item?.field||payload?.field;if(!field)return false;windowState.value={...windowState.value,[field]:payload?.value};effects.push({kind:'windowFormPatch',ref:null,value:{[field]:payload?.value}});return true;},
-                setInputParameters:value=>{state.input=value||{};effects.push({kind:'input',ref,value:state.input});return true;},setFilter:value=>{effects.push({kind:'filter',ref,value:value||{}});return true;},
+                setInputParameters:value=>{state.input=value||{};effects.push({kind:'input',ref,value:state.input});return true;},setFilter:payload=>{
+                  const explicit=payload?.filter;
+                  const wrapped=explicit&&typeof explicit==='object'&&!Array.isArray(explicit);
+                  const filter=wrapped?explicit:(payload||{});
+                  if(wrapped)state.input={...state.input,filter,page:1};
+                  effects.push({kind:'filter',ref,value:filter,resetPage:!!wrapped});return true;
+                },
                 fetchCollection:options=>{effects.push({kind:'fetch',ref,value:options||{}});return true;},resetSelection:()=>{effects.push({kind:'resetSelection',ref,value:{}});return true;}
               },window:{openDialog:value=>{effects.push({kind:'openDialog',ref:null,value:value||{}});return true;},closeDialog:value=>{effects.push({kind:'closeDialog',ref:null,value:value||{}});return true;},openWindow:value=>{effects.push({kind:'openWindow',ref:null,value:value||{}});return true;},openTarget:value=>{effects.push({kind:'openTarget',ref:null,value:value||{}});return true;}}}};
               contexts[ref]=ctx;return ctx;

@@ -2,6 +2,8 @@ package com.viant.forgeandroid.runtime
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.evaluate
+import com.viant.forgeandroid.ui.commitToolbarQuickSearch
+import com.viant.forgeandroid.ui.toolbarQuickSearchField
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -18,6 +20,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -229,6 +233,89 @@ class ActionHookRuntimeTest {
         assertEquals("review", runtime.windowContext(window.windowId).peekWindowForm()["mode"])
         assertEquals(2L, source.collection.peek().single()["id"])
         assertEquals(2L, source.peekSelection().selected?.get("id"))
+    }
+
+    @Test
+    fun quickSearchDispatchesAuthoredFilterOncePerEditOnItsConfiguredSource() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """
+            {
+              "namespace":"Fixture",
+              "authorizationSnapshot":{"principal":{"features":[]}},
+              "actions":{"code":"({search: ({context,target,event,value}) => { if (target.value !== value || event.target.value !== value) throw new Error('Bad search value'); const filter = {...context.handlers.dataSource.peekFilter()}; delete filter.visibility; if (value.trim()) filter.query = value; else { delete filter.query; if (!context.authorization.principal.features.includes('ShowAll')) filter.visibility = 'public'; } return context.handlers.dataSource.setFilter({filter}); }, raw: ({context}) => context.handlers.dataSource.setFilter({category:'raw'}), clear: ({context}) => context.handlers.dataSource.setFilter({filter:{}})})"},
+              "dataSource":{"records":{"autoFetch":false},"local":{"autoFetch":false,"filterMode":"client"}},
+              "view":{"content":{"containers":[{"table":{"toolbar":{"items":[{"id":"listSearch","type":"quickSearch","dataField":"query","on":[{"event":"onChange","handler":"Fixture.search"}]}]}}}]}}
+            }
+            """.trimIndent()
+        )
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val runtime = ForgeRuntime(emptyMap(), scope)
+        val reads = Channel<InputState>(Channel.UNLIMITED)
+        runtime.registerDataSourceLoader { request ->
+            reads.trySend(request.input)
+            ForgeRuntime.DataSourceFetchResult(rows = emptyList())
+        }
+        val state = runtime.openWindowInline("fixture", "Fixture", metadata = metadata)
+        val window = runtime.windowContext(state.windowId)
+        val defaultSource = window.context("records")
+        val source = window.contextForInstance("visibleRecords", "records")
+        val item = metadata.view!!.content!!.containers.single().table!!.toolbar!!.items.single()
+        val field = toolbarQuickSearchField(item, null)
+        val initial = InputState(
+            filter = mapOf("category" to "news", "visibility" to "public"),
+            parameters = mapOf("limit" to 10),
+            page = 3
+        )
+        source.input.set(initial)
+
+        suspend fun assertRead(expected: Map<String, Any?>, expectedPage: Int = 1) {
+            val input = withTimeout(5_000) { reads.receive() }
+            assertEquals(expected, input.filter)
+            assertEquals(expectedPage, input.page)
+            assertEquals(initial.parameters, input.parameters)
+            withTimeout(5_000) { source.input.flow.first { !it.fetch && it.filter == expected } }
+        }
+
+        try {
+            commitToolbarQuickSearch(runtime, source, item, field, "", "")
+            commitToolbarQuickSearch(runtime, source, item, field, "needle", "")
+            assertRead(mapOf("category" to "news", "query" to "needle"))
+            commitToolbarQuickSearch(runtime, source, item, field, "needle", "needle")
+            commitToolbarQuickSearch(runtime, source, item, field, "", "needle")
+            assertRead(initial.filter)
+
+            runtime.updatePreviewPrincipal(state.windowId, roles = emptySet(), features = setOf("ShowAll"))
+            commitToolbarQuickSearch(runtime, source, item, field, "needle", "")
+            assertRead(mapOf("category" to "news", "query" to "needle"))
+            commitToolbarQuickSearch(runtime, source, item, field, "", "needle")
+            assertRead(mapOf("category" to "news"))
+
+            source.input.update { it.copy(page = 3) }
+            runtime.execute(ExecutionDef(handler = "Fixture.raw"), source)?.join()
+            assertRead(mapOf("category" to "raw"), expectedPage = 3)
+            runtime.execute(ExecutionDef(handler = "Fixture.clear"), source)?.join()
+            assertRead(emptyMap())
+            assertEquals(emptyMap(), defaultSource.peekFilter())
+
+            val local = window.context("local")
+            local.input.set(initial)
+            val builtIn = item.copy(on = emptyList())
+            commitToolbarQuickSearch(runtime, local, builtIn, field, "needle", "")
+            assertEquals(initial.filter + (field to "needle"), local.peekFilter())
+            commitToolbarQuickSearch(runtime, local, builtIn, field, "", "needle")
+            assertEquals(initial, local.input.peek())
+            val scopedItem = builtIn.copy(scope = "windowForm")
+            commitToolbarQuickSearch(runtime, local, scopedItem, field, "window text", "")
+            assertEquals("window text", window.peekWindowForm()[field])
+            assertEquals(initial, local.input.peek())
+
+            commitToolbarQuickSearch(runtime, local, item, field, "client needle", "")
+            assertEquals(initial.copy(filter = mapOf("category" to "news", "query" to "client needle"), page = 1), local.input.peek())
+            assertTrue(reads.tryReceive().isFailure)
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test

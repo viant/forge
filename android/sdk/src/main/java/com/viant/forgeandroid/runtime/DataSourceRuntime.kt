@@ -1155,8 +1155,14 @@ class DataSourceContext(
         }
     }
 
-    fun setFilter(filter: Map<String, Any?>) {
-        input.set(input.peek().copy(filter = filter, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null, refreshOwner = null, refreshBypassCache = false))
+    fun setFilter(filter: Map<String, Any?>) = setFilter(filter, resetPage = false, fetch = true)
+
+    internal fun setFilter(filter: Map<String, Any?>, resetPage: Boolean, fetch: Boolean) {
+        input.update { current ->
+            current.copy(filter = filter, page = if (resetPage) 1 else current.page, fetch = fetch,
+                preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null,
+                preparedReadPermit = null, refreshOwner = null, refreshBypassCache = false)
+        }
     }
 
     internal fun captureRequest(snapshot: InputState): DataSourceContext = DataSourceContext(

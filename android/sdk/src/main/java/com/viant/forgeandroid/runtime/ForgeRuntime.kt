@@ -438,7 +438,10 @@ class ForgeRuntime(
         val code = metadata.actions?.code?.trim().orEmpty()
         val handler = execution.handler?.trim().orEmpty()
         if (code.isBlank() || handler.isBlank()) return null
-        val contexts = metadata.dataSources.keys.mapNotNull { ref -> context.window.contextOrNull(ref)?.let { ref to it } }.toMap()
+        val contexts = metadata.dataSources.keys.mapNotNull { ref ->
+            val target = if (ref == context.dataSourceRef) context else context.window.contextOrNull(ref)
+            target?.let { ref to it }
+        }.toMap()
         val snapshots = actionSnapshots(contexts)
         val executionValue = mapOf(
             "handler" to execution.handler,
@@ -480,7 +483,7 @@ class ForgeRuntime(
     private fun applyUIActionEffects(source: DataSourceContext, effects: List<UIActionEffect>, metadata: WindowMetadata) {
         effects.forEach { effect ->
             val value = JsonUtil.elementToAny(effect.value)
-            val target = effect.ref?.let(source.window::contextOrNull)
+            val target = effect.ref?.let { ref -> if (ref == source.dataSourceRef) source else source.window.contextOrNull(ref) }
             when (effect.kind) {
                 "form" -> (value as? Map<*, *>)?.let { target?.setForm(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
                 "collection" -> (value as? List<*>)?.let { rows ->
@@ -495,7 +498,15 @@ class ForgeRuntime(
                 "windowForm" -> (value as? Map<*, *>)?.let { setWindowFormValues(source.window.windowId, it.entries.associate { entry -> entry.key.toString() to entry.value }, bumpPrefillRevision = false) }
                 "windowFormPatch" -> (value as? Map<*, *>)?.let { setWindowFormValues(source.window.windowId, it.entries.associate { entry -> entry.key.toString() to entry.value }, bumpPrefillRevision = false) }
                 "input" -> (value as? Map<*, *>)?.let { target?.setInputParameters(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
-                "filter" -> (value as? Map<*, *>)?.let { target?.setFilter(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
+                "filter" -> if (target != null && value is Map<*, *>) {
+                    val filter = value["filter"]
+                    if (filter is Map<*, *>) {
+                        target.setFilter(JsonUtil.asStringMap(filter), resetPage = true,
+                            fetch = !target.dataSource.filterMode.equals("client", ignoreCase = true))
+                    } else {
+                        target.setFilter(JsonUtil.asStringMap(value))
+                    }
+                }
                 "fetch" -> target?.fetchCollection()
                 "resetSelection" -> target?.resetSelection()
                 "openDialog" -> applyProjectedOpenDialog(source, value, metadata)

@@ -59,6 +59,9 @@ public struct TableRenderer: View {
     @State private var activeFilters: [String: JSONValue] = [:]
     @State private var filterDraft: TableFilterDraft?
     @State private var searchText = ""
+    @State private var authoredSearchDraft = ""
+    @State private var authoredSearchSubmission: String?
+    @FocusState private var authoredSearchFocused: Bool
     @State private var exportingCSV = false
     @State private var exportError: String?
     @State private var hiddenColumnKeys: Set<String> = []
@@ -96,15 +99,15 @@ public struct TableRenderer: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
-            if !(rows.isEmpty && table.emptyState != nil), let toolbar = table.toolbar, !toolbar.items.isEmpty {
-                tableToolbar(
-                    ToolbarDef(
-                        items: toolbar.items.filter { item in
-                            !(rows.isEmpty && (table.emptyState?.hideToolbarItems.contains(item.id ?? "") == true))
-                                && toolbarItemIsVisible(item)
-                        }
-                    )
-                )
+            if let toolbar = table.toolbar {
+                let items = toolbar.items.filter { item in
+                    let empty = rows.isEmpty && table.emptyState != nil
+                    let explicitlyHidden = rows.isEmpty && table.emptyState?.hideToolbarItems.contains(item.id ?? "") == true
+                    return (!empty || authoredSearchField(item) != nil) && !explicitlyHidden && toolbarItemIsVisible(item)
+                }
+                if !items.isEmpty {
+                    tableToolbar(ToolbarDef(items: items))
+                }
             }
             if !(rows.isEmpty && table.emptyState != nil),
                table.toolbar == nil,
@@ -382,6 +385,20 @@ public struct TableRenderer: View {
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
         seedPlannerSelectionIfNeeded(rows)
         guard rows.isEmpty else {
+            return
+        }
+        let initialization = table.on.filter { $0.event == "onInit" }
+        if !initialization.isEmpty {
+            let snapshot = await runtime.registeredDataSourceSnapshot(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            guard !Task.isCancelled, snapshot?.collection == nil, snapshot?.control.loading != true,
+                  snapshot?.control.inactive != true, snapshot?.control.error == nil else { return }
+            let context = ExecutionContext(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            for execution in initialization {
+                guard !Task.isCancelled else { return }
+                await runtime.execute(execution, context: context)
+            }
+            rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            seedPlannerSelectionIfNeeded(rows)
             return
         }
         if tableShouldAutoFetch(
@@ -1200,6 +1217,9 @@ public struct TableRenderer: View {
                 .accessibilityLabel(search.properties["label"]?.stringValue ?? "Search table")
                 .disabled(toolbarItemIsDisabled(search))
                 .onChange(of: searchText) { _, _ in clientPage = 1 }
+        } else if let search = toolbar.items.first(where: { authoredSearchField($0) != nil }),
+                  let field = authoredSearchField(search) {
+            authoredQuickSearch(search, field: field)
         } else {
             Spacer(minLength: 0)
         }
@@ -1230,7 +1250,7 @@ public struct TableRenderer: View {
             .accessibilityLabel("Export CSV")
             .disabled(toolbarItemIsDisabled(export))
         }
-        if !tableToolbarHasRefreshAction,
+        if !(rows.isEmpty && table.emptyState != nil), !tableToolbarHasRefreshAction,
            tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
             tableRefreshControl
         }
@@ -1253,6 +1273,55 @@ public struct TableRenderer: View {
                     )
                 }
             }
+        }
+    }
+
+    private func authoredSearchField(_ item: ToolbarItemDef) -> String? {
+        guard runtime != nil, window != nil, !resolvedDataSourceRef.isEmpty,
+              filterDefinition != nil, !clientFiltering, item.type?.lowercased() == "quicksearch",
+              item.scope?.lowercased() != "windowform", item.on.contains(where: { $0.event == "onChange" }) else { return nil }
+        let field = (item.dataField ?? item.properties["field"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return field.isEmpty ? nil : field
+    }
+
+    private func authoredQuickSearch(_ item: ToolbarItemDef, field: String) -> some View {
+        let committed = input.filter[field]?.stringValue ?? ""
+        let label = item.properties["label"]?.stringValue ?? "Search"
+        return TextField(item.properties["placeholder"]?.stringValue ?? label, text: $authoredSearchDraft)
+            .modifier(ForgeThemeInputModifier())
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel(item.ariaLabel ?? label)
+            .disabled(controlState.inactive || toolbarItemIsDisabled(item))
+            .focused($authoredSearchFocused)
+            .onSubmit { submitAuthoredSearch(item, committed: committed) }
+            .onChange(of: authoredSearchFocused) { _, focused in
+                if !focused { submitAuthoredSearch(item, committed: committed) }
+            }
+            .onChange(of: authoredSearchDraft) { _, _ in
+                if item.properties["requestTrigger"]?.stringValue == "change" {
+                    submitAuthoredSearch(item, committed: committed)
+                }
+            }
+            .onChange(of: committed, initial: true) { _, value in
+                if authoredSearchSubmission == nil || authoredSearchSubmission == value {
+                    authoredSearchDraft = value
+                    authoredSearchSubmission = nil
+                }
+            }
+    }
+
+    private func submitAuthoredSearch(_ item: ToolbarItemDef, committed: String) {
+        let next = authoredSearchDraft
+        guard next != (authoredSearchSubmission ?? committed), !controlState.inactive,
+              toolbarItemIsVisible(item), !toolbarItemIsDisabled(item), let runtime, let window else { return }
+        authoredSearchSubmission = next
+        let context = ExecutionContext(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        let value = JSONValue.string(next)
+        Task {
+            for execution in item.on where execution.event == "onChange" {
+                await runtime.execute(execution, context: context, args: ["target": .object(["value": value]), "value": value])
+            }
+            if authoredSearchSubmission == next { authoredSearchSubmission = nil }
         }
     }
 

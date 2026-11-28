@@ -1211,7 +1211,12 @@ public actor ForgeRuntime {
             case "windowForm": if let values = value?.objectValue { await setWindowFormValue(windowID: context.windowID, values: values, bumpPrefillRevision: false) }
             case "windowFormPatch": if let values = value?.objectValue { await setWindowFormValue(windowID: context.windowID, values: values, bumpPrefillRevision: false) }
             case "input": if let ref, let values = value?.objectValue { await setDataSourceInputParameters(windowID: context.windowID, dataSourceRef: ref, parameters: values) }
-            case "filter": if let ref, let values = value?.objectValue { await setDataSourceFilter(windowID: context.windowID, dataSourceRef: ref, filter: values) }
+            case "filter":
+                if let ref, let values = value?.objectValue {
+                    let resetPage = object["resetPage"] == .bool(true)
+                    let fetch = !resetPage || metadata.dataSources[ref]?.filterMode?.lowercased() != "client"
+                    await replaceDataSourceFilter(windowID: context.windowID, dataSourceRef: ref, filter: values, resetPage: resetPage, fetch: fetch)
+                }
             case "fetch":
                 if let ref, metadata.dataSources[ref] != nil {
                     if let current {

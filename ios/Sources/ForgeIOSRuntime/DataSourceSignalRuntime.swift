@@ -124,8 +124,18 @@ extension ForgeRuntime {
         dataSourceRef: String,
         filter: [String: JSONValue]
     ) async {
+        await replaceDataSourceFilter(windowID: windowID, dataSourceRef: dataSourceRef, filter: filter, resetPage: false)
+    }
+
+    func replaceDataSourceFilter(
+        windowID: String,
+        dataSourceRef: String,
+        filter: [String: JSONValue],
+        resetPage: Bool,
+        fetch: Bool = true
+    ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
-        await dataSourceRuntime.setFilter(dataSourceID: dataSourceID, filter: filter)
+        await dataSourceRuntime.replaceFilter(dataSourceID: dataSourceID, filter: filter, resetPage: resetPage, fetch: fetch)
         let signal = await signals.input(dataSourceID: dataSourceID)
         let next = await dataSourceRuntime.input(dataSourceID: dataSourceID)
         await signal.set(next)

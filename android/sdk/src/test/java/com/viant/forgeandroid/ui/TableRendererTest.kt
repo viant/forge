@@ -22,6 +22,15 @@ import kotlin.test.assertTrue
 
 class TableRendererTest {
     @Test
+    fun `authored remote search keeps producer rows and allows clearing after empty results`() {
+        val rows = sortedTableRows(listOf(mapOf("id" to 1, "description" to "matching details")), null, true)
+        assertEquals(rows, applyTableQuickSearch(rows, "Search", "matching", authoredRemoteSearch = true))
+        assertEquals(emptyList(), applyTableQuickSearch(rows, "Search", "matching", authoredRemoteSearch = false))
+        assertTrue(tableToolbarVisible(showMetadataEmptyState = true, authoredRemoteSearch = true))
+        assertFalse(tableToolbarVisible(showMetadataEmptyState = true, authoredRemoteSearch = false))
+    }
+
+    @Test
     fun `compact table freezes explicit and sticky left columns`() {
         assertTrue(compactColumnFrozen(ColumnDef(id = "id", frozen = true)))
         assertTrue(compactColumnFrozen(ColumnDef(id = "name", sticky = "left")))

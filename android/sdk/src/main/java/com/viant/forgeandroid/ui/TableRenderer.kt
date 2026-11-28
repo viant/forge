@@ -94,6 +94,8 @@ fun TableRenderer(
     var sortColumnId by remember(table.columns) { mutableStateOf<String?>(null) }
     var sortAscending by remember(table.columns) { mutableStateOf(true) }
     val quickSearchItem = table.toolbar?.items?.firstOrNull(::toolbarItemIsQuickSearch)
+    val clientFilter = context.dataSource.filterMode.equals("client", true)
+    val authoredRemoteSearch = !clientFilter && quickSearchItem?.on?.any { it.event == "onChange" } == true
     val quickSearchField = quickSearchItem?.let { toolbarQuickSearchField(it, quickFilterSetForTable(context)) }
     val quickSearchQuery = quickSearchField?.let { input.filter[it]?.toString()?.trim() }.orEmpty()
     var projectedDisplayValues by remember(rows, table.columns) { mutableStateOf<Map<Int, Map<String, Any?>>>(emptyMap()) }
@@ -119,15 +121,10 @@ fun TableRenderer(
         if (sourceRows == rows) projectedDisplayValues = projected
     }
     val baseSortedRows = sortedTableRows(rows, sortColumnId, sortAscending, projectedDisplayValues)
-    val clientSortedRows = if (context.dataSource.filterMode.equals("client", true)) {
+    val clientSortedRows = if (clientFilter) {
         applyClientTableFilters(baseSortedRows, quickFilterSetForTable(context), input.filter)
     } else baseSortedRows
-    val sortedRows = clientSortedRows.let { indexed ->
-        if (quickSearchQuery.isBlank()) indexed else indexed.filter { row ->
-            val searchable = quickSearchField?.let { field -> resolveTableField(row.displayRow, field)?.toString() }.orEmpty()
-            searchable.contains(quickSearchQuery, ignoreCase = true)
-        }
-    }
+    val sortedRows = applyTableQuickSearch(clientSortedRows, quickSearchField, quickSearchQuery, authoredRemoteSearch)
     val refreshFeedback = tableRefreshFeedback(control.loading, control.error)
     val showMetadataEmptyState = table.emptyState != null && sortedRows.isEmpty() &&
         !control.loading && control.error.isNullOrBlank()
@@ -139,7 +136,7 @@ fun TableRenderer(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (!showMetadataEmptyState) table.toolbar?.let { tb ->
+        if (tableToolbarVisible(showMetadataEmptyState, authoredRemoteSearch)) table.toolbar?.let { tb ->
             TableToolbar(
                 runtime,
                 context,
@@ -240,6 +237,21 @@ fun TableRenderer(
                 currentPage = input.page ?: 1
             )
         }
+    }
+}
+
+internal fun tableToolbarVisible(showMetadataEmptyState: Boolean, authoredRemoteSearch: Boolean): Boolean =
+    !showMetadataEmptyState || authoredRemoteSearch
+
+internal fun applyTableQuickSearch(
+    rows: List<IndexedTableRow>,
+    field: String?,
+    query: String,
+    authoredRemoteSearch: Boolean
+): List<IndexedTableRow> {
+    if (authoredRemoteSearch || field == null || query.isBlank()) return rows
+    return rows.filter { row ->
+        resolveTableField(row.displayRow, field)?.toString().orEmpty().contains(query, ignoreCase = true)
     }
 }
 

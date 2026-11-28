@@ -4953,6 +4953,70 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(rows.first?["status"], .string("active"))
     }
 
+    func testProjectedTableSearchAppliesScopedFiltersAndResetsServerPaging() async throws {
+        actor Requests {
+            var inputs: [InputState] = []
+            func record(_ input: InputState) { inputs.append(input) }
+        }
+
+        for showAll in [false, true] {
+            let requests = Requests()
+            let runtime = ForgeRuntime()
+            var clientSource = DataSourceDef()
+            clientSource.filterMode = "client"
+            let metadata = WindowMetadata(
+                namespace: "Example",
+                dataSources: ["events": DataSourceDef(), "clientEvents": clientSource],
+                actions: ActionsDef(code: """
+                (() => {
+                    function apply({context, text}) {
+                        const filter = {...context.handlers.dataSource.peekFilter()};
+                        delete filter.search;
+                        delete filter.publicOnly;
+                        if (text.trim()) filter.search = text;
+                        else if (!context.authorization.showAll) filter.publicOnly = true;
+                        return context.handlers.dataSource.setFilter({filter});
+                    }
+                    return {
+                        initialize: ({context}) => apply({context, text:""}),
+                        search: ({context, target}) => apply({context, text:target.value}),
+                        legacy: ({context}) => context.handlers.dataSource.setFilter({category:"release"})
+                    };
+                })()
+                """),
+                authorizationSnapshot: ["showAll": .bool(showAll)]
+            )
+            let window = await runtime.openWindowInline(key: "workspace", title: "Workspace", metadata: metadata)
+            let context = ExecutionContext(windowID: window.id, dataSourceRef: "events")
+            await runtime.registerDataSourceLoader { request in
+                await requests.record(request.input)
+                return ForgeRuntime.DataSourceFetchResult(rows: [request.input.filter])
+            }
+
+            let baseline: [String: JSONValue] = showAll ? [:] : ["publicOnly": .bool(true)]
+            let initialize = ExecutionDef(action: "Example.initialize", event: "onInit")
+            let search = ExecutionDef(action: "Example.search", event: "onChange")
+            await runtime.execute(initialize, context: context)
+            await runtime.setDataSourcePage(windowID: window.id, dataSourceRef: "events", page: 3)
+            await runtime.execute(search, context: context, args: ["target": .object(["value": .string("release")])])
+            await runtime.execute(search, context: context, args: ["target": .object(["value": .string("")])])
+            let cleared = await runtime.dataSourceCollection(windowID: window.id, dataSourceRef: "events")
+            XCTAssertEqual(cleared, [baseline])
+
+            await runtime.setDataSourcePage(windowID: window.id, dataSourceRef: "events", page: 4)
+            await runtime.execute(ExecutionDef(action: "Example.legacy"), context: context)
+            await runtime.execute(initialize, context: .init(windowID: window.id, dataSourceRef: "clientEvents"))
+            let clientInput = await runtime.dataSourceInputState(windowID: window.id, dataSourceRef: "clientEvents")
+            XCTAssertEqual(clientInput.filter, baseline)
+            XCTAssertEqual(clientInput.page, 1)
+            XCTAssertFalse(clientInput.fetch)
+
+            let inputs = await requests.inputs
+            XCTAssertEqual(inputs.map(\.page), [1, 3, 1, 1, 4, 4])
+            XCTAssertEqual(inputs.map(\.filter), [baseline, baseline, ["search": .string("release")], baseline, baseline, ["category": .string("release")]])
+        }
+    }
+
     func testExecuteAutoRegistersBuiltInHandlers() async throws {
         let runtime = ForgeRuntime()
         let metadata = WindowMetadata(view: ViewDef(content: ContentDef()))

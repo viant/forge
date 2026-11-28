@@ -325,10 +325,14 @@ public actor DataSourceRuntime {
     }
 
     public func setFilter(dataSourceID: String, filter: [String: JSONValue]) {
+        replaceFilter(dataSourceID: dataSourceID, filter: filter, resetPage: false)
+    }
+
+    func replaceFilter(dataSourceID: String, filter: [String: JSONValue], resetPage: Bool, fetch: Bool = true) {
         let input = inputValues[dataSourceID] ?? InputState()
         inputValues[dataSourceID] = InputState(
             filter: filter, parameters: input.parameters,
-            page: input.page, fetch: true, refresh: input.refresh)
+            page: resetPage ? 1 : input.page, fetch: fetch, refresh: input.refresh)
     }
 
     public func setPage(dataSourceID: String, page: Int?) {
